@@ -1,0 +1,11 @@
+# Runtime outputs
+reports/audit-*.jsonl
+data/reputation.jsonl
+gate/receipts/*.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS noise
+.DS_Store
