@@ -1,0 +1,18 @@
+{
+  "name": "internal-antivirus",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Policy and checks for Internal Antivirus",
+  "scripts": {
+    "policy:check": "python3 scripts/policy_check.py --policy policy.yaml",
+    "policy:check:json": "python3 scripts/policy_check.py --policy policy.yaml --json",
+    "setup": "python3 scripts/setup_wizard.py --policy policy.yaml",
+    "scan:surface": "python3 scripts/scan_surface.py --pretty",
+    "scan:skill": "python3 scripts/scan_skill.py",
+    "gate:preinstall": "python3 scripts/preinstall_gate.py",
+    "install:skill": "python3 scripts/install_skill.py",
+    "rotate:audit": "python3 scripts/rotate_audit.py",
+    "report": "python3 scripts/report.py --pretty",
+    "test:regression": "python3 scripts/run_regression.py --policy policy.yaml"
+  }
+}

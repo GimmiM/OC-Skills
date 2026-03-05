@@ -1,0 +1,87 @@
+version: 2
+name: curated-v2
+updated_at: "2026-03-05"
+rules:
+  - rid: OBF-DOUBLE-ENCODE
+    severity: high
+    weight: 22
+    category: obfuscation
+    pattern: "(?:base64|openssl\\s+enc)[^\\n]{0,260}(?:base64|bash|sh|python)"
+    message: "Potential multi-step obfuscation chain."
+
+  - rid: PERSIST-LAUNCHD
+    severity: high
+    weight: 20
+    category: persistence
+    pattern: "(?:LaunchAgents|launchctl\\s+load|~/Library/LaunchAgents)"
+    message: "macOS persistence mechanism detected."
+
+  - rid: PERSIST-CRON
+    severity: medium
+    weight: 14
+    category: persistence
+    pattern: "(?:crontab\\s+-e|/etc/cron\\.|@reboot)"
+    message: "Cron persistence pattern detected."
+
+  - rid: DEFENSE-EVASION-XATTR
+    severity: high
+    weight: 20
+    category: defense_evasion
+    pattern: "xattr\\s+-[crd]"
+    message: "xattr tampering detected (possible Gatekeeper bypass prep)."
+
+  - rid: DEFENSE-EVASION-CHATTR
+    severity: high
+    weight: 20
+    category: defense_evasion
+    pattern: "chattr\\s+\\+i"
+    message: "Immutable flag manipulation detected."
+
+  - rid: STEAL-BROWSER-DATA
+    severity: high
+    weight: 22
+    category: credential_theft
+    pattern: "(?:Chrome|Brave|Firefox).{0,120}(?:Cookies|Login Data|keychain|wallet)"
+    message: "Possible browser credential/wallet theft pattern."
+
+  - rid: SECRET-FILE-READ
+    severity: high
+    weight: 20
+    category: credential_theft
+    pattern: "(?:id_rsa|id_ed25519|\\.env|seed phrase|mnemonic).{0,120}(?:cat|cp|tar|zip)"
+    message: "Sensitive secret material read/archive pattern."
+
+  - rid: NETCAT-REVSHELL
+    severity: critical
+    weight: 40
+    category: remote_execution
+    pattern: "(?:nc|ncat|netcat).{0,180}(?:-e\\s*(?:/bin/sh|/bin/bash)|/bin/sh)"
+    message: "Reverse shell pattern via netcat."
+
+  - rid: PYTHON-REVSHELL
+    severity: critical
+    weight: 40
+    category: remote_execution
+    pattern: "python(?:3)?[^\\n]{0,220}(?:socket\\.socket|subprocess\\.Popen).{0,220}(?:/bin/sh|/bin/bash)"
+    message: "Python reverse shell behavior pattern."
+
+  - rid: PWSH-IEX-DOWNLOAD
+    severity: critical
+    weight: 40
+    category: remote_execution
+    pattern: "(?:powershell|pwsh)[^\\n]{0,220}(?:IEX|Invoke-Expression)[^\\n]{0,220}(?:DownloadString|iwr|irm)"
+    message: "PowerShell download-and-execute pattern."
+
+  - rid: ARCHIVE-PASSWORD
+    severity: medium
+    weight: 12
+    category: social_engineering
+    pattern: "(?:password|пароль)\\s*[:=]?\\s*(?:1234|openclaw|infected|malware)"
+    message: "Weak/shared archive password indicator."
+
+  - rid: SUSP-PASTE-DROP
+    severity: high
+    weight: 20
+    category: binary_delivery
+    pattern: "(?:pastebin|glot\\.io|raw\\.githubusercontent\\.com).{0,180}(?:curl|wget|bash|sh)"
+    message: "Code fetch from paste/raw host with execution chain."

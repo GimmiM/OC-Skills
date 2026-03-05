@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.openclaw/internal-antivirus/policy.schema.json",
+  "title": "Internal Antivirus Policy",
+  "type": "object",
+  "required": [
+    "version",
+    "name",
+    "owner",
+    "modes",
+    "report_delivery_lock",
+    "command_interface",
+    "security_hard_guards",
+    "install_workflow",
+    "components",
+    "risk_update_policy",
+    "change_control",
+    "acceptance_criteria"
+  ],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string", "minLength": 1 },
+    "status": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "modes": {
+      "type": "object",
+      "required": ["default_mode", "available"],
+      "properties": {
+        "default_mode": { "enum": ["strict", "assist", "change_on_command"] },
+        "available": {
+          "type": "object",
+          "required": ["strict", "assist", "change_on_command"]
+        }
+      }
+    },
+    "report_delivery_lock": {
+      "type": "object",
+      "required": ["enabled", "channel", "chat_id", "thread_id", "topic", "policy"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "channel": { "type": "string" },
+        "chat_id": { "type": "string" },
+        "thread_id": { "type": "string" },
+        "topic": { "type": "string" },
+        "policy": { "type": "string" }
+      }
+    },
+    "command_interface": {
+      "type": "object",
+      "required": ["enabled", "aliases", "triggers"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "aliases": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "triggers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "security_hard_guards": {
+      "type": "object",
+      "required": [
+        "no_install_during_intel_collection",
+        "no_exec_during_intel_collection",
+        "no_skill_apply_without_owner_approval",
+        "no_network_exfiltration",
+        "immutable_audit_log",
+        "require_hash_for_artifacts"
+      ],
+      "additionalProperties": { "type": "boolean" }
+    },
+    "install_workflow": {
+      "type": "object",
+      "required": ["mandatory_preinstall_gate", "gate_script", "install_wrapper_script", "blocked_decisions", "review_requires_owner_approval"],
+      "properties": {
+        "mandatory_preinstall_gate": { "type": "boolean" },
+        "gate_script": { "type": "string" },
+        "install_wrapper_script": { "type": "string" },
+        "blocked_decisions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "review_requires_owner_approval": { "type": "boolean" }
+      }
+    },
+    "components": {
+      "type": "object",
+      "required": [
+        "intel_collector",
+        "normalizer",
+        "rule_builder",
+        "validator",
+        "policy_engine",
+        "approver",
+        "publisher"
+      ]
+    },
+    "risk_update_policy": {
+      "type": "object",
+      "required": ["auto_to_staging", "auto_to_active", "owner_approval_required_for_active"]
+    },
+    "change_control": {
+      "type": "object",
+      "required": [
+        "llm_can_propose_changes",
+        "llm_can_directly_modify_active",
+        "llm_can_run_dangerous_commands",
+        "code_change_requires"
+      ]
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    }
+  }
+}

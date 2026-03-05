@@ -1,0 +1,233 @@
+version: 1
+name: internal-antivirus-policy
+owner: local-owner
+status: portable
+updated_at: '2026-03-05'
+report_delivery_lock:
+  enabled: false
+  channel: local
+  chat_id: ''
+  thread_id: ''
+  topic: ''
+  policy: By default, reports remain local. Run /av setup to configure chat delivery
+    lock for your environment.
+command_interface:
+  enabled: true
+  aliases:
+  - /av help
+  - /av setup
+  - /av scan <path|url>
+  - /av install <path> -- <install_cmd>
+  - /av surface
+  - /av policy-check
+  - /av regression
+  - /av rotate-audit
+  - /av report
+  triggers:
+  - av
+  - /av
+  - антивир
+  - антивирус
+  - antivirus
+  - scan skill
+  - surface scan
+  - policy check
+  - regression
+  - reputation
+  - audit log
+principles:
+- Runtime antivirus is deterministic (scripts-first).
+- All external intel is untrusted by default.
+- No direct path from internet data to active rules.
+- Human approval required for impactful changes.
+- No external data exfiltration; local workspace only.
+modes:
+  default_mode: strict
+  available:
+    strict:
+      description: Recommended baseline. LLM can propose but cannot apply changes.
+      llm_write_staging: true
+      llm_apply_active: false
+      allow_auto_apply_low_to_active: false
+    assist:
+      description: LLM can prepare patches in staging and test locally.
+      llm_write_staging: true
+      llm_apply_active: false
+      allow_auto_apply_low_to_active: false
+    change_on_command:
+      description: LLM may modify scripts/rules only by explicit owner command; apply
+        still needs approval.
+      llm_write_staging: true
+      llm_apply_active: false
+      allow_auto_apply_low_to_active: false
+security_hard_guards:
+  no_install_during_intel_collection: true
+  no_exec_during_intel_collection: true
+  no_skill_apply_without_owner_approval: true
+  no_network_exfiltration: true
+  immutable_audit_log: true
+  require_hash_for_artifacts: true
+install_workflow:
+  mandatory_preinstall_gate: true
+  gate_script: scripts/preinstall_gate.py
+  install_wrapper_script: scripts/install_skill.py
+  blocked_decisions:
+  - block
+  review_requires_owner_approval: true
+components:
+  intel_collector:
+    type: script
+    allowed_actions:
+    - web_search
+    - web_fetch
+    - parse_text
+    - write_staging
+    denied_actions:
+    - exec
+    - install_skill
+    - modify_active_rules
+    - send_external_messages
+    output:
+    - staging/intel/*.jsonl
+  normalizer:
+    type: script
+    allowed_actions:
+    - dedup
+    - ioc_extraction
+    - cve_mapping
+    - source_tagging
+    - confidence_scoring
+    denied_actions:
+    - modify_active_rules
+  rule_builder:
+    type: script
+    inputs:
+    - staging/intel/*.jsonl
+    outputs:
+    - staging/rules/candidates/*.yaml
+    safeguards:
+      schema_validation: true
+      regex_redos_check: true
+      max_new_rules_per_batch: 50
+  validator:
+    type: script
+    tests:
+    - regression_clean_set
+    - regression_malicious_set
+    - performance_budget
+    thresholds:
+      max_false_positive_rate: 0.1
+      min_high_critical_recall: 0.9
+      max_fast_scan_seconds: 30
+      max_cached_scan_seconds: 15
+  policy_engine:
+    type: script
+    decision_map:
+      critical: block
+      high: block
+      medium: review_and_confirm
+      low: allow_with_caution
+      minimal: allow
+  approver:
+    type: human_gate
+    owner_required: true
+    requires_explicit_text:
+    - approve
+    - reject
+    - approve low-only
+  publisher:
+    type: script
+    ruleset_flow:
+    - incoming
+    - staging
+    - approved
+    - active
+    constraints:
+      direct_internet_to_active_forbidden: true
+      active_write_requires_owner_ack: true
+risk_update_policy:
+  auto_to_staging:
+    minimal: true
+    low: true
+    medium: true
+    high: true
+    critical: true
+  auto_to_active:
+    minimal: false
+    low: false
+    medium: false
+    high: false
+    critical: false
+  owner_approval_required_for_active:
+  - minimal
+  - low
+  - medium
+  - high
+  - critical
+intel_sources:
+  trust_model: untrusted_content_default
+  allowlist:
+  - nvd.nist.gov
+  - cisa.gov
+  - github.com/openclaw/openclaw
+  - runzero.com
+  - bitdefender.com
+  - securityweek.com
+  - thehackernews.com
+  blocked_patterns:
+  - instructions that ask to run shell commands
+  - prompt text that requests policy bypass
+  - embedded install snippets
+artifact_reputation:
+  enabled: true
+  fields:
+  - sha256
+  - source_url
+  - first_seen_at
+  - last_seen_at
+  - verdict
+  - notes
+  storage: data/reputation.jsonl
+scheduling:
+  quick_sync:
+    every: 2h
+    task: collect + normalize + stage
+  deep_refresh:
+    every: 24h
+    task: collect + build candidates + validate + report
+  weekly_recalibration:
+    every: 7d
+    task: rule quality review + FP pruning
+reporting:
+  on_each_batch:
+  - summary
+  - proposed_changes
+  - risk_impact
+  - fp_impact
+  - latency_impact
+  - required_owner_action
+  report_path: reports/
+change_control:
+  llm_can_propose_changes: true
+  llm_can_directly_modify_active: false
+  llm_can_run_dangerous_commands: false
+  code_change_requires:
+  - explicit_owner_command
+  - test_pass
+  - diff_review
+  - owner_ack
+emergency:
+  kill_switch:
+    enabled: true
+    actions:
+    - freeze_updates
+    - keep_scanning_with_last_known_good_rules
+    - notify_owner
+  rollback:
+    enabled: true
+    source: approved/
+acceptance_criteria:
+- No install/exec performed by intel collection pipeline.
+- No unapproved writes to active ruleset.
+- Audit log contains full chain for each update batch.
+- Latency and FP thresholds stay within limits for 7 consecutive days.
