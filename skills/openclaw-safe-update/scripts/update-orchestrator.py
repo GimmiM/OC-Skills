@@ -2,8 +2,6 @@
 """
 OpenClaw Safe Update Orchestrator
 CLI contract: JSON I/O, fixed exit codes, --dry-run support
-
-Configuration: Edit OPENCLAW_DIR and NODE_MODULES_PATH below for your setup
 """
 
 import argparse
@@ -17,16 +15,11 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-# Configuration - EDIT THESE PATHS FOR YOUR SYSTEM
-# Default: ~/.openclaw
+# Configuration
 OPENCLAW_DIR = Path.home() / ".openclaw"
 BACKUP_DIR = OPENCLAW_DIR / "backups"
-
-# Default npm global install path for OpenClaw
-# Adjust if installed differently (e.g., /usr/local/lib/node_modules/openclaw)
-NODE_MODULES_PATH = Path.home() / ".nvm/versions/node/v24.13.1/lib/node_modules/openclaw"
-
-GATEWAY_URL = "http://localhost:PORT"  # Set to your OpenClaw gateway port (default: 18789)
+NODE_MODULES_PATH = Path("~/.nvm/versions/node/v24.13.1/lib/node_modules/openclaw").expanduser()
+GATEWAY_URL = "http://localhost:PORT  # Set your OpenClaw gateway port"
 
 # Exit codes
 EXIT_SUCCESS = 0
@@ -182,6 +175,11 @@ def action_backup(args):
         if not tarfile.is_tarfile(archive_path):
             raise Exception("Archive integrity check failed")
         
+        # Set secure permissions (owner only)
+        import os
+        os.chmod(archive_path, 0o600)  # rw-------
+        os.chmod(BACKUP_DIR, 0o700)    # rwx------ (new files inherit)
+        
         # Cleanup temp directory
         import shutil
         shutil.rmtree(backup_path)
@@ -293,6 +291,7 @@ def action_verify(args):
     checks["config_exists"] = config_file.exists()
     
     # Check 2: Gateway can start (basic check)
+    # We'll check if the gateway binary/script exists
     gateway_start = OPENCLAW_DIR / "gateway-start.sh"
     checks["gateway_script_exists"] = gateway_start.exists()
     
@@ -366,8 +365,31 @@ def action_rollback(args):
     run_command("pkill -f 'openclaw gateway' 2>/dev/null || true")
     time.sleep(2)
     
+    # Verify archive integrity before extraction
     try:
-        # Extract backup
+        # Check 1: Valid tarfile
+        if not tarfile.is_tarfile(archive_path):
+            raise Exception(f"Archive is not a valid tar file: {archive_path}")
+        
+        # Check 2: Can list contents (not corrupted)
+        with tarfile.open(archive_path, "r:gz") as test_tar:
+            members = test_tar.getmembers()
+            if not members:
+                raise Exception("Archive is empty")
+            # Check 3: No suspicious paths (basic path traversal check)
+            for member in members:
+                if member.name.startswith('/') or '..' in member.name:
+                    raise Exception(f"Suspicious path in archive: {member.name}")
+    except Exception as e:
+        print(json.dumps(json_output(
+            "error", "rollback",
+            error=f"Archive verification failed: {str(e)}. Do not proceed with rollback.",
+            duration_ms=int((time.time() - start) * 1000)
+        )))
+        return EXIT_GENERAL_ERROR
+    
+    try:
+        # Extract backup to temp location first (safely)
         with tarfile.open(archive_path, "r:gz") as tar:
             # Extract to temp location first
             temp_extract = BACKUP_DIR / "rollback-temp"
@@ -380,6 +402,12 @@ def action_rollback(args):
                 raise Exception("No directory found in backup archive")
             
             backup_content = extracted_dirs[0]
+            
+            # Verify extracted content has essential files before removing live data
+            required_items = ["openclaw.json", "workspace"]
+            missing = [item for item in required_items if not (backup_content / item).exists()]
+            if missing:
+                raise Exception(f"Backup missing essential items: {missing}. Aborting rollback.")
             
             # Restore files
             restored = []
