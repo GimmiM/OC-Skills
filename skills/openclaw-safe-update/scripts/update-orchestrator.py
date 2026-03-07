@@ -125,6 +125,26 @@ def action_backup(args):
         )))
         return EXIT_SUCCESS
     
+    # Check available disk space (need at least 500MB)
+    MIN_FREE_MB = 500
+    try:
+        stat = os.statvfs(OPENCLAW_DIR)
+        free_mb = (stat.f_bavail * stat.f_frsize) / (1024 * 1024)
+        if free_mb < MIN_FREE_MB:
+            print(json.dumps(json_output(
+                "error", "backup",
+                error=f"Insufficient disk space: {free_mb:.0f}MB free, need at least {MIN_FREE_MB}MB",
+                duration_ms=int((time.time() - start) * 1000)
+            )))
+            return EXIT_BACKUP_FAILED
+    except Exception as e:
+        print(json.dumps(json_output(
+            "error", "backup",
+            error=f"Failed to check disk space: {str(e)}",
+            duration_ms=int((time.time() - start) * 1000)
+        )))
+        return EXIT_BACKUP_FAILED
+    
     # Ensure backup directory exists
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     
