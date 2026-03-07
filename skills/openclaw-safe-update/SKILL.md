@@ -73,6 +73,15 @@ All scripts output structured JSON:
 - `4` - Verification failed
 - `5` - Needs user confirmation
 
+## Testing
+
+Run smoke tests to verify functionality:
+```bash
+python3 scripts/eval-smoke.py
+```
+
+Tests cover: version check, backup creation, confirmation requirement, and system verification.
+
 ## References
 
 - Full protocol: `references/update-protocol.md`
